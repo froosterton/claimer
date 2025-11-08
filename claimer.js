@@ -20,6 +20,23 @@ client.on('ready', () => {
   console.log(`[CLAIM] Logged in as ${client.user.tag}`);
 });
 
+// Log all user messages
+client.on('messageCreate', (msg) => {
+  try {
+    if (msg.author?.bot) return; // Skip bot messages
+    if (!msg.guild) return; // Skip DMs
+    
+    const guildName = msg.guild.name || 'Unknown';
+    const channelName = msg.channel?.name || msg.channel?.id || 'Unknown';
+    const authorTag = msg.author?.tag || msg.author?.id || 'Unknown';
+    const content = msg.content || '(no content)';
+    
+    console.log(`[MESSAGE] ${authorTag} in #${channelName} (${guildName}): ${content}`);
+  } catch (err) {
+    console.error('Message logger error:', err?.message || err);
+  }
+});
+
 client.on('messageCreate', (msg) => {
   try {
     if (!msg.embeds?.length) return;
