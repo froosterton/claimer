@@ -93,6 +93,21 @@ client.on('messageCreate', (msg) => {
   }
 });
 
+// Log Discord tag whenever any message is sent in claim server
+client.on('messageCreate', (msg) => {
+  try {
+    if (!msg.guild) return;
+    if (msg.guild.id !== CLAIM_SERVER_ID) return;
+    if (msg.author?.bot) return;
+
+    if (lastWebhookDiscordUser) {
+      console.log(`[CLAIM] Discord tag: ${lastWebhookDiscordUser}`);
+    }
+  } catch (err) {
+    console.error('Message logger error:', err?.message || err);
+  }
+});
+
 client.on('messageCreate', async (msg) => {
   try {
     if (!msg.guild) return;
@@ -105,8 +120,6 @@ client.on('messageCreate', async (msg) => {
       console.log('[CLAIM] Nothing to claim yet.');
       return;
     }
-
-    console.log(`[CLAIM] Discord tag: ${lastWebhookDiscordUser}`);
 
     console.log(`[CLAIM] Sending claim for ${lastWebhookDiscordUser} to ${CLAIM_GROUP_DM_ID}`);
     await axios.post(
