@@ -1,11 +1,14 @@
-const ClientUserSettingManager = require('discord.js-selfbot-v13/src/managers/ClientUserSettingManager');
 const { Client } = require('discord.js-selfbot-v13');
 const axios = require('axios');
 
-// --- patch library so any token works ---
+// load after Client so the library finishes initializing
+const clientUserSettingsPath = require.resolve(
+  'discord.js-selfbot-v13/src/managers/ClientUserSettingManager'
+);
+const ClientUserSettingManager = require(clientUserSettingsPath);
 const originalPatch = ClientUserSettingManager.prototype._patch;
 ClientUserSettingManager.prototype._patch = function (data = {}) {
-  const safeData = {
+  const safe = {
     ...data,
     friend_source_flags: data.friend_source_flags ?? {},
     guild_folders: data.guild_folders ?? [],
@@ -16,10 +19,9 @@ ClientUserSettingManager.prototype._patch = function (data = {}) {
     user_settings: data.user_settings ?? {},
   };
 
-  return originalPatch.call(this, safeData);
+  return originalPatch.call(this, safe);
 };
 
-// --- configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLAIM_AUTH_TOKEN = process.env.CLAIM_AUTH_TOKEN || TOKEN;
 const CLAIM_SERVER_ID = process.env.CLAIM_SERVER_ID;
