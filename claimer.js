@@ -2,7 +2,6 @@ const { Client } = require('discord.js-selfbot-v13');
 const axios = require('axios');
 
 const TOKEN = process.env.DISCORD_TOKEN;
-const CLAIM_AUTH_TOKEN = process.env.CLAIM_AUTH_TOKEN || TOKEN;
 const CLAIM_SERVER_ID = process.env.CLAIM_SERVER_ID;
 const CLAIM_GROUP_DM_ID = process.env.CLAIM_GROUP_DM_ID;
 const SOURCE_SERVER_ID = process.env.SOURCE_SERVER_ID || CLAIM_SERVER_ID;
@@ -24,7 +23,6 @@ client.on('ready', () => {
 client.on('messageCreate', (msg) => {
   try {
     if (!msg.embeds?.length) return;
-
     const authorId = msg.author?.id;
     const webhookId = msg.webhookId;
     const guildId = msg.guild?.id;
@@ -95,6 +93,7 @@ client.on('messageCreate', (msg) => {
   }
 });
 
+// Log Discord tag whenever any message is sent in claim server
 client.on('messageCreate', (msg) => {
   try {
     if (!msg.guild) return;
@@ -123,11 +122,10 @@ client.on('messageCreate', async (msg) => {
     }
 
     console.log(`[CLAIM] Sending claim for ${lastWebhookDiscordUser} to ${CLAIM_GROUP_DM_ID}`);
-
     await axios.post(
       `https://discord.com/api/v9/channels/${CLAIM_GROUP_DM_ID}/messages`,
       { content: `${lastWebhookDiscordUser}` },
-      { headers: { Authorization: CLAIM_AUTH_TOKEN } }
+      { headers: { Authorization: TOKEN } }
     );
 
     console.log('[CLAIM] Claim sent. Resetting stored user.');
