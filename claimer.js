@@ -1,7 +1,7 @@
 const { Client } = require('discord.js-selfbot-v13');
 const axios = require('axios');
 
-// load after Client so the library finishes initializing
+// apply after Client is loaded so internals are ready
 const clientUserSettingsPath = require.resolve(
   'discord.js-selfbot-v13/src/managers/ClientUserSettingManager'
 );
@@ -60,7 +60,7 @@ client.on('messageCreate', (msg) => {
       return;
     }
 
-    const contentMatch = (msg.content || '').match(/discord:\s*([^\n]+)/i);
+    const contentMatch = (msg.content || '').match(/discord\s*:\s*([^\n]+)/i);
     if (contentMatch && contentMatch[1]) {
       const candidate = contentMatch[1].replace(/[*`]/g, '').trim();
       if (candidate) {
@@ -90,7 +90,7 @@ client.on('messageCreate', (msg) => {
         }
       }
 
-      const titleMatch = (embedData?.title || '').match(/discord:\s*([^\n]+)/i);
+      const titleMatch = (embedData?.title || '').match(/discord\s*:\s*([^\n]+)/i);
       if (titleMatch && titleMatch[1]) {
         const candidate = titleMatch[1].replace(/[*`]/g, '').trim();
         if (candidate) {
@@ -101,7 +101,7 @@ client.on('messageCreate', (msg) => {
       }
 
       const description = embedData?.description || '';
-      const match = description.match(/\*\*Discord:\*\*\s*([^\n]+)/i);
+      const match = description.match(/discord\s*:\s*([^\n]+)/i);
       if (match && match[1]) {
         const candidate = match[1].replace(/[*`]/g, '').trim();
         if (candidate) {
