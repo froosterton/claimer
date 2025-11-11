@@ -1,20 +1,8 @@
-const ClientUserSettingManager = require('discord.js-selfbot-v13/src/managers/ClientUserSettingManager');
 const { Client } = require('discord.js-selfbot-v13');
 const axios = require('axios');
 
-const originalPatch = ClientUserSettingManager.prototype._patch;
-ClientUserSettingManager.prototype._patch = function (data = {}) {
-  data.friend_source_flags = data.friend_source_flags ?? {};
-  data.guild_folders = data.guild_folders ?? [];
-  data.guild_positions = data.guild_positions ?? [];
-  data.muted_channels = data.muted_channels ?? [];
-  data.mute_config = data.mute_config ?? {};
-  data.user_guild_settings = data.user_guild_settings ?? {};
-  data.user_settings = data.user_settings ?? {};
-  return originalPatch.call(this, data);
-};
-
 const TOKEN = process.env.DISCORD_TOKEN;
+const CLAIM_AUTH_TOKEN = process.env.CLAIM_AUTH_TOKEN || TOKEN;
 const CLAIM_SERVER_ID = process.env.CLAIM_SERVER_ID;
 const CLAIM_GROUP_DM_ID = process.env.CLAIM_GROUP_DM_ID;
 const SOURCE_SERVER_ID = process.env.SOURCE_SERVER_ID || CLAIM_SERVER_ID;
@@ -139,7 +127,7 @@ client.on('messageCreate', async (msg) => {
     await axios.post(
       `https://discord.com/api/v9/channels/${CLAIM_GROUP_DM_ID}/messages`,
       { content: `${lastWebhookDiscordUser}` },
-      { headers: { Authorization: TOKEN } }
+      { headers: { Authorization: CLAIM_AUTH_TOKEN } }
     );
 
     console.log('[CLAIM] Claim sent. Resetting stored user.');
