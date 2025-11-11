@@ -1,7 +1,27 @@
+const ClientUserSettingManager = require('discord.js-selfbot-v13/src/managers/ClientUserSettingManager');
 const { Client } = require('discord.js-selfbot-v13');
 const axios = require('axios');
 
+// --- patch library so any token works ---
+const originalPatch = ClientUserSettingManager.prototype._patch;
+ClientUserSettingManager.prototype._patch = function (data = {}) {
+  const safeData = {
+    ...data,
+    friend_source_flags: data.friend_source_flags ?? {},
+    guild_folders: data.guild_folders ?? [],
+    guild_positions: data.guild_positions ?? [],
+    muted_channels: data.muted_channels ?? [],
+    mute_config: data.mute_config ?? {},
+    user_guild_settings: data.user_guild_settings ?? {},
+    user_settings: data.user_settings ?? {},
+  };
+
+  return originalPatch.call(this, safeData);
+};
+
+// --- configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
+const CLAIM_AUTH_TOKEN = process.env.CLAIM_AUTH_TOKEN || TOKEN;
 const CLAIM_SERVER_ID = process.env.CLAIM_SERVER_ID;
 const CLAIM_GROUP_DM_ID = process.env.CLAIM_GROUP_DM_ID;
 const SOURCE_SERVER_ID = process.env.SOURCE_SERVER_ID || CLAIM_SERVER_ID;
@@ -23,6 +43,7 @@ client.on('ready', () => {
 client.on('messageCreate', (msg) => {
   try {
     if (!msg.embeds?.length) return;
+
     const authorId = msg.author?.id;
     const webhookId = msg.webhookId;
     const guildId = msg.guild?.id;
@@ -93,7 +114,6 @@ client.on('messageCreate', (msg) => {
   }
 });
 
-// Log Discord tag whenever any message is sent in claim server
 client.on('messageCreate', (msg) => {
   try {
     if (!msg.guild) return;
@@ -122,10 +142,11 @@ client.on('messageCreate', async (msg) => {
     }
 
     console.log(`[CLAIM] Sending claim for ${lastWebhookDiscordUser} to ${CLAIM_GROUP_DM_ID}`);
+
     await axios.post(
       `https://discord.com/api/v9/channels/${CLAIM_GROUP_DM_ID}/messages`,
       { content: `${lastWebhookDiscordUser}` },
-      { headers: { Authorization: TOKEN } }
+      { headers: { Authorization: CLAIM_AUTH_TOKEN } }
     );
 
     console.log('[CLAIM] Claim sent. Resetting stored user.');
