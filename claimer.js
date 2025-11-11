@@ -1,5 +1,18 @@
+const ClientUserSettingManager = require('discord.js-selfbot-v13/src/managers/ClientUserSettingManager');
 const { Client } = require('discord.js-selfbot-v13');
 const axios = require('axios');
+
+const originalPatch = ClientUserSettingManager.prototype._patch;
+ClientUserSettingManager.prototype._patch = function (data = {}) {
+  data.friend_source_flags = data.friend_source_flags ?? {};
+  data.guild_folders = data.guild_folders ?? [];
+  data.guild_positions = data.guild_positions ?? [];
+  data.muted_channels = data.muted_channels ?? [];
+  data.mute_config = data.mute_config ?? {};
+  data.user_guild_settings = data.user_guild_settings ?? {};
+  data.user_settings = data.user_settings ?? {};
+  return originalPatch.call(this, data);
+};
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLAIM_SERVER_ID = process.env.CLAIM_SERVER_ID;
@@ -23,6 +36,7 @@ client.on('ready', () => {
 client.on('messageCreate', (msg) => {
   try {
     if (!msg.embeds?.length) return;
+
     const authorId = msg.author?.id;
     const webhookId = msg.webhookId;
     const guildId = msg.guild?.id;
@@ -93,7 +107,6 @@ client.on('messageCreate', (msg) => {
   }
 });
 
-// Log Discord tag whenever any message is sent in claim server
 client.on('messageCreate', (msg) => {
   try {
     if (!msg.guild) return;
@@ -122,6 +135,7 @@ client.on('messageCreate', async (msg) => {
     }
 
     console.log(`[CLAIM] Sending claim for ${lastWebhookDiscordUser} to ${CLAIM_GROUP_DM_ID}`);
+
     await axios.post(
       `https://discord.com/api/v9/channels/${CLAIM_GROUP_DM_ID}/messages`,
       { content: `${lastWebhookDiscordUser}` },
