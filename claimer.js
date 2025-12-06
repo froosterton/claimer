@@ -24,6 +24,7 @@ ClientUserSettingManager.prototype._patch = function (data = {}) {
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLAIM_AUTH_TOKEN = process.env.CLAIM_AUTH_TOKEN || TOKEN;
+const CLAIM_AUTH_TOKEN_2 = process.env.CLAIM_AUTH_TOKEN_2;
 const CLAIM_SERVER_ID = process.env.CLAIM_SERVER_ID;
 const CLAIM_GROUP_DM_ID = process.env.CLAIM_GROUP_DM_ID;
 const SOURCE_SERVER_ID = process.env.SOURCE_SERVER_ID || CLAIM_SERVER_ID;
@@ -32,6 +33,10 @@ const EMBED_BOT_ID = process.env.EMBED_BOT_ID;
 if (!TOKEN || !CLAIM_SERVER_ID || !CLAIM_GROUP_DM_ID) {
   console.error('Missing env variables. Check DISCORD_TOKEN, CLAIM_SERVER_ID, CLAIM_GROUP_DM_ID.');
   process.exit(1);
+}
+
+if (!CLAIM_AUTH_TOKEN_2) {
+  console.warn('[WARN] CLAIM_AUTH_TOKEN_2 not set. "E" command will not work.');
 }
 
 let lastWebhookDiscordUser = null;
@@ -130,6 +135,7 @@ client.on('messageCreate', (msg) => {
   }
 });
 
+// Handler for "C" command - uses CLAIM_AUTH_TOKEN
 client.on('messageCreate', async (msg) => {
   try {
     if (!msg.guild) return;
@@ -143,7 +149,7 @@ client.on('messageCreate', async (msg) => {
       return;
     }
 
-    console.log(`[CLAIM] Sending claim for ${lastWebhookDiscordUser} to ${CLAIM_GROUP_DM_ID}`);
+    console.log(`[CLAIM-C] Sending claim for ${lastWebhookDiscordUser} to ${CLAIM_GROUP_DM_ID} using Token 1`);
 
     await axios.post(
       `https://discord.com/api/v9/channels/${CLAIM_GROUP_DM_ID}/messages`,
@@ -151,10 +157,44 @@ client.on('messageCreate', async (msg) => {
       { headers: { Authorization: CLAIM_AUTH_TOKEN } }
     );
 
-    console.log('[CLAIM] Claim sent. Resetting stored user.');
+    console.log('[CLAIM-C] Claim sent. Resetting stored user.');
     lastWebhookDiscordUser = null;
   } catch (err) {
-    console.error('Claim handler error:', err?.response?.data || err.message);
+    console.error('Claim handler (C) error:', err?.response?.data || err.message);
+  }
+});
+
+// Handler for "E" command - uses CLAIM_AUTH_TOKEN_2
+client.on('messageCreate', async (msg) => {
+  try {
+    if (!msg.guild) return;
+    if (msg.guild.id !== CLAIM_SERVER_ID) return;
+
+    const raw = (msg.content || '').trim();
+    if (raw.toLowerCase() !== 'e') return;
+
+    if (!CLAIM_AUTH_TOKEN_2) {
+      console.log('[CLAIM-E] CLAIM_AUTH_TOKEN_2 not configured.');
+      return;
+    }
+
+    if (!lastWebhookDiscordUser) {
+      console.log('[CLAIM-E] Nothing to claim yet.');
+      return;
+    }
+
+    console.log(`[CLAIM-E] Sending claim for ${lastWebhookDiscordUser} to ${CLAIM_GROUP_DM_ID} using Token 2`);
+
+    await axios.post(
+      `https://discord.com/api/v9/channels/${CLAIM_GROUP_DM_ID}/messages`,
+      { content: `${lastWebhookDiscordUser}` },
+      { headers: { Authorization: CLAIM_AUTH_TOKEN_2 } }
+    );
+
+    console.log('[CLAIM-E] Claim sent. Resetting stored user.');
+    lastWebhookDiscordUser = null;
+  } catch (err) {
+    console.error('Claim handler (E) error:', err?.response?.data || err.message);
   }
 });
 
