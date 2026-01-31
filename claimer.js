@@ -170,7 +170,7 @@ client.on('messageCreate', async (msg) => {
     if (msg.guild.id !== CLAIM_SERVER_ID) return;
 
     const raw = (msg.content || '').trim();
-    if (raw.toLowerCase() !== 'c') return;
+    if (!['c', 'e'].includes(raw.toLowerCase())) return;
 
     if (!lastWebhookDiscordUser) {
       console.log('[CLAIM] Nothing to claim yet.');
