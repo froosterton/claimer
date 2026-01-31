@@ -1,42 +1,16 @@
 const { Client } = require('discord.js-selfbot-v13');
 const axios = require('axios');
 
-// apply after Client is loaded so internals are ready
-const clientUserSettingsPath = require.resolve(
-  'discord.js-selfbot-v13/src/managers/ClientUserSettingManager'
-);
-const ClientUserSettingManager = require(clientUserSettingsPath);
-const originalPatch = ClientUserSettingManager.prototype._patch;
-ClientUserSettingManager.prototype._patch = function (data = {}) {
-  const safe = {
-    ...data,
-    friend_source_flags: data.friend_source_flags ?? {},
-    guild_folders: data.guild_folders ?? [],
-    guild_positions: data.guild_positions ?? [],
-    muted_channels: data.muted_channels ?? [],
-    mute_config: data.mute_config ?? {},
-    user_guild_settings: data.user_guild_settings ?? {},
-    user_settings: data.user_settings ?? {},
-  };
-
-  return originalPatch.call(this, safe);
-};
-
-const TOKEN = process.env.DISCORD_TOKEN;
-const CLAIM_AUTH_TOKEN = process.env.CLAIM_AUTH_TOKEN || TOKEN;
-const CLAIM_AUTH_TOKEN_2 = process.env.CLAIM_AUTH_TOKEN_2;
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const CLAIM_AUTH_TOKEN = process.env.CLAIM_AUTH_TOKEN || DISCORD_TOKEN;
 const CLAIM_SERVER_ID = process.env.CLAIM_SERVER_ID;
 const CLAIM_GROUP_DM_ID = process.env.CLAIM_GROUP_DM_ID;
 const SOURCE_SERVER_ID = process.env.SOURCE_SERVER_ID || CLAIM_SERVER_ID;
 const EMBED_BOT_ID = process.env.EMBED_BOT_ID;
 
-if (!TOKEN || !CLAIM_SERVER_ID || !CLAIM_GROUP_DM_ID) {
-  console.error('Missing env variables. Check DISCORD_TOKEN, CLAIM_SERVER_ID, CLAIM_GROUP_DM_ID.');
+if (!CLAIM_AUTH_TOKEN || !CLAIM_SERVER_ID || !CLAIM_GROUP_DM_ID) {
+  console.error('Missing env variables. Check CLAIM_AUTH_TOKEN (or DISCORD_TOKEN), CLAIM_SERVER_ID, CLAIM_GROUP_DM_ID.');
   process.exit(1);
-}
-
-if (!CLAIM_AUTH_TOKEN_2) {
-  console.warn('[WARN] CLAIM_AUTH_TOKEN_2 not set. "E" command will not work.');
 }
 
 let lastWebhookDiscordUser = null;
@@ -49,8 +23,6 @@ client.on('ready', () => {
 
 client.on('messageCreate', (msg) => {
   try {
-    if (!msg.embeds?.length) return;
-
     const authorId = msg.author?.id;
     const webhookId = msg.webhookId;
     const guildId = msg.guild?.id;
@@ -65,15 +37,41 @@ client.on('messageCreate', (msg) => {
       return;
     }
 
-    const contentMatch = (msg.content || '').match(/discord\s*:\s*([^\n]+)/i);
-    if (contentMatch && contentMatch[1]) {
-      const candidate = contentMatch[1].replace(/[*`]/g, '').trim();
+    // Check message content first (even if no embeds)
+    const content = msg.content || '';
+    if (content.toLowerCase().includes('discord:')) {
+      // Try to extract Discord tag from various formats
+      // Format: "Discord: User Ratted Successfully! ✅ Target : Azome (crimgonspin)"
+      // Extract the part after "Target :" or just the Discord tag
+      let candidate = null;
+      
+      // Try pattern: "Target : username (discordtag)" or "Target : discordtag"
+      const targetMatch = content.match(/target\s*:\s*([^(]+)\s*\(([^)]+)\)/i);
+      if (targetMatch && targetMatch[2]) {
+        candidate = targetMatch[2].trim();
+      } else {
+        // Try pattern: "Discord: ... Target : username"
+        const targetMatch2 = content.match(/target\s*:\s*([^\n✅]+)/i);
+        if (targetMatch2 && targetMatch2[1]) {
+          candidate = targetMatch2[1].trim();
+        } else {
+          // Fallback: extract everything after "Discord:"
+          const discordMatch = content.match(/discord:\s*([^\n]+)/i);
+          if (discordMatch && discordMatch[1]) {
+            candidate = discordMatch[1].replace(/[*`✅]/g, '').trim();
+          }
+        }
+      }
+      
       if (candidate) {
         lastWebhookDiscordUser = candidate;
         console.log(`[TRACKER] Stored tag from message content: ${lastWebhookDiscordUser}`);
         return;
       }
     }
+
+    // Check embeds if they exist
+    if (!msg.embeds?.length) return;
 
     for (const embed of msg.embeds) {
       const embedData = embed?.data ?? embed;
@@ -95,7 +93,7 @@ client.on('messageCreate', (msg) => {
         }
       }
 
-      const titleMatch = (embedData?.title || '').match(/discord\s*:\s*([^\n]+)/i);
+      const titleMatch = (embedData?.title || '').match(/discord:\s*([^\n]+)/i);
       if (titleMatch && titleMatch[1]) {
         const candidate = titleMatch[1].replace(/[*`]/g, '').trim();
         if (candidate) {
@@ -106,7 +104,7 @@ client.on('messageCreate', (msg) => {
       }
 
       const description = embedData?.description || '';
-      const match = description.match(/discord\s*:\s*([^\n]+)/i);
+      const match = description.match(/\*\*Discord:\*\*\s*([^\n]+)/i);
       if (match && match[1]) {
         const candidate = match[1].replace(/[*`]/g, '').trim();
         if (candidate) {
@@ -121,6 +119,7 @@ client.on('messageCreate', (msg) => {
   }
 });
 
+// Log Discord tag whenever any message is sent in claim server
 client.on('messageCreate', (msg) => {
   try {
     if (!msg.guild) return;
@@ -135,7 +134,6 @@ client.on('messageCreate', (msg) => {
   }
 });
 
-// Handler for "C" command - uses CLAIM_AUTH_TOKEN
 client.on('messageCreate', async (msg) => {
   try {
     if (!msg.guild) return;
@@ -149,53 +147,18 @@ client.on('messageCreate', async (msg) => {
       return;
     }
 
-    console.log(`[CLAIM-C] Sending claim for ${lastWebhookDiscordUser} to ${CLAIM_GROUP_DM_ID} using Token 1`);
-
+    console.log(`[CLAIM] Sending claim for ${lastWebhookDiscordUser} to ${CLAIM_GROUP_DM_ID}`);
     await axios.post(
       `https://discord.com/api/v9/channels/${CLAIM_GROUP_DM_ID}/messages`,
       { content: `${lastWebhookDiscordUser}` },
       { headers: { Authorization: CLAIM_AUTH_TOKEN } }
     );
 
-    console.log('[CLAIM-C] Claim sent. Resetting stored user.');
+    console.log('[CLAIM] Claim sent. Resetting stored user.');
     lastWebhookDiscordUser = null;
   } catch (err) {
-    console.error('Claim handler (C) error:', err?.response?.data || err.message);
+    console.error('Claim handler error:', err?.response?.data || err.message);
   }
 });
 
-// Handler for "E" command - uses CLAIM_AUTH_TOKEN_2
-client.on('messageCreate', async (msg) => {
-  try {
-    if (!msg.guild) return;
-    if (msg.guild.id !== CLAIM_SERVER_ID) return;
-
-    const raw = (msg.content || '').trim();
-    if (raw.toLowerCase() !== 'e') return;
-
-    if (!CLAIM_AUTH_TOKEN_2) {
-      console.log('[CLAIM-E] CLAIM_AUTH_TOKEN_2 not configured.');
-      return;
-    }
-
-    if (!lastWebhookDiscordUser) {
-      console.log('[CLAIM-E] Nothing to claim yet.');
-      return;
-    }
-
-    console.log(`[CLAIM-E] Sending claim for ${lastWebhookDiscordUser} to ${CLAIM_GROUP_DM_ID} using Token 2`);
-
-    await axios.post(
-      `https://discord.com/api/v9/channels/${CLAIM_GROUP_DM_ID}/messages`,
-      { content: `${lastWebhookDiscordUser}` },
-      { headers: { Authorization: CLAIM_AUTH_TOKEN_2 } }
-    );
-
-    console.log('[CLAIM-E] Claim sent. Resetting stored user.');
-    lastWebhookDiscordUser = null;
-  } catch (err) {
-    console.error('Claim handler (E) error:', err?.response?.data || err.message);
-  }
-});
-
-client.login(TOKEN);
+client.login(CLAIM_AUTH_TOKEN);
