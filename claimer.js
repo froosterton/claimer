@@ -25,6 +25,7 @@ ClientUserSettingManager.prototype._patch = function (data = {}) {
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const CLAIM_AUTH_TOKEN = process.env.CLAIM_AUTH_TOKEN || DISCORD_TOKEN;
+const CLAIM_AUTH_TOKEN_E = process.env.CLAIM_AUTH_TOKEN_E;
 const CLAIM_SERVER_ID = process.env.CLAIM_SERVER_ID;
 const CLAIM_GROUP_DM_ID = process.env.CLAIM_GROUP_DM_ID;
 const SOURCE_SERVER_ID = process.env.SOURCE_SERVER_ID || CLAIM_SERVER_ID;
@@ -39,13 +40,8 @@ console.log('[CLAIM] Env OK. Connecting to Discord...');
 
 let lastWebhookDiscordUser = null;
 
-const client = new Client({ checkUpdate: false });
-
-client.on('ready', () => {
-  console.log(`[CLAIM] Logged in as ${client.user.tag}`);
-});
-
-client.on('messageCreate', (msg) => {
+function attachTracker(client) {
+  client.on('messageCreate', (msg) => {
   try {
     const authorId = msg.author?.id;
     const webhookId = msg.webhookId;
@@ -147,7 +143,16 @@ client.on('messageCreate', (msg) => {
   } catch (err) {
     console.error('Tracker error:', err?.message || err);
   }
+  });
+}
+
+const client = new Client({ checkUpdate: false });
+
+client.on('ready', () => {
+  console.log(`[CLAIM] Logged in as ${client.user.tag}`);
 });
+
+attachTracker(client);
 
 // Log Discord tag whenever any message is sent in claim server
 client.on('messageCreate', (msg) => {
@@ -164,13 +169,14 @@ client.on('messageCreate', (msg) => {
   }
 });
 
+// Instance 1: triggers on "c"
 client.on('messageCreate', async (msg) => {
   try {
     if (!msg.guild) return;
     if (msg.guild.id !== CLAIM_SERVER_ID) return;
 
     const raw = (msg.content || '').trim();
-    if (!['c', 'e'].includes(raw.toLowerCase())) return;
+    if (raw.toLowerCase() !== 'c') return;
 
     if (!lastWebhookDiscordUser) {
       console.log('[CLAIM] Nothing to claim yet.');
@@ -195,3 +201,45 @@ client.login(CLAIM_AUTH_TOKEN).catch((err) => {
   console.error('[CLAIM] Login failed:', err?.message || err);
   process.exit(1);
 });
+
+// Instance 2: second token monitors for "e" and sends claim
+if (CLAIM_AUTH_TOKEN_E) {
+  const clientE = new Client({ checkUpdate: false });
+
+  clientE.on('ready', () => {
+    console.log(`[CLAIM-E] Logged in as ${clientE.user.tag}`);
+  });
+
+  attachTracker(clientE);
+
+  clientE.on('messageCreate', async (msg) => {
+    try {
+      if (!msg.guild) return;
+      if (msg.guild.id !== CLAIM_SERVER_ID) return;
+
+      const raw = (msg.content || '').trim();
+      if (raw.toLowerCase() !== 'e') return;
+
+      if (!lastWebhookDiscordUser) {
+        console.log('[CLAIM-E] Nothing to claim yet.');
+        return;
+      }
+
+      console.log(`[CLAIM-E] Sending claim for ${lastWebhookDiscordUser} to ${CLAIM_GROUP_DM_ID}`);
+      await axios.post(
+        `https://discord.com/api/v9/channels/${CLAIM_GROUP_DM_ID}/messages`,
+        { content: `${lastWebhookDiscordUser}` },
+        { headers: { Authorization: CLAIM_AUTH_TOKEN_E } }
+      );
+
+      console.log('[CLAIM-E] Claim sent. Resetting stored user.');
+      lastWebhookDiscordUser = null;
+    } catch (err) {
+      console.error('Claim-E handler error:', err?.response?.data || err.message);
+    }
+  });
+
+  clientE.login(CLAIM_AUTH_TOKEN_E).catch((err) => {
+    console.error('[CLAIM-E] Login failed:', err?.message || err);
+  });
+}
