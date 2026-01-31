@@ -1,6 +1,26 @@
 const { Client } = require('discord.js-selfbot-v13');
 const axios = require('axios');
 
+// Patch ClientUserSettingManager to handle missing/null data from Discord READY payload
+const clientUserSettingsPath = require.resolve(
+  'discord.js-selfbot-v13/src/managers/ClientUserSettingManager'
+);
+const ClientUserSettingManager = require(clientUserSettingsPath);
+const originalPatch = ClientUserSettingManager.prototype._patch;
+ClientUserSettingManager.prototype._patch = function (data = {}) {
+  const safe = {
+    ...data,
+    friend_source_flags: data.friend_source_flags ?? {},
+    guild_folders: data.guild_folders ?? [],
+    guild_positions: data.guild_positions ?? [],
+    muted_channels: data.muted_channels ?? [],
+    mute_config: data.mute_config ?? {},
+    user_guild_settings: data.user_guild_settings ?? {},
+    user_settings: data.user_settings ?? {},
+  };
+  return originalPatch.call(this, safe);
+};
+
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const CLAIM_AUTH_TOKEN = process.env.CLAIM_AUTH_TOKEN || DISCORD_TOKEN;
 const CLAIM_SERVER_ID = process.env.CLAIM_SERVER_ID;
