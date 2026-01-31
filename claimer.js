@@ -53,11 +53,16 @@ client.on('messageCreate', (msg) => {
 
     if (SOURCE_SERVER_ID && guildId !== SOURCE_SERVER_ID) return;
 
+    // EMBED_BOT_ID: when set, only process messages from that bot/webhook.
+    // Unset for testing with Discohook (different webhook ID).
     if (
       EMBED_BOT_ID &&
       authorId !== EMBED_BOT_ID &&
       webhookId !== EMBED_BOT_ID
     ) {
+      if (msg.embeds?.length) {
+        console.log(`[TRACKER] Skipped embed from author=${authorId} webhook=${webhookId} (EMBED_BOT_ID=${EMBED_BOT_ID}). Unset EMBED_BOT_ID to test with Discohook.`);
+      }
       return;
     }
 
@@ -128,7 +133,8 @@ client.on('messageCreate', (msg) => {
       }
 
       const description = embedData?.description || '';
-      const match = description.match(/\*\*Discord:\*\*\s*([^\n]+)/i);
+      // Match **Discord:** X (bold) or plain Discord: X - flexible for Discohook/Notif APP
+      const match = description.match(/(?:\*\*)?Discord(?:\*\*)?\s*:\s*([^\n]+)/i);
       if (match && match[1]) {
         const candidate = match[1].replace(/[*`]/g, '').trim();
         if (candidate) {
